@@ -1,58 +1,54 @@
-# 🤖 Telegram UserBot – Heroku Deployable
+<h1 align="center">🤖 Telegram UserBot - Auto Message Sender</h1>
 
-This is a **Telegram UserBot** manager bot that allows you to:
+<p align="center">
+  🔐 Session-based Telegram UserBot with auto messaging control via Bot commands.
+</p>
 
-- 🔐 Login using **session string**
-- 📤 Send automated messages from your user account
-- ⏱ Set message interval
-- ⚙️ Fully controllable with Telegram bot commands
-
----
-
-## 🧠 Features
-
-- Secure **session-based login** via `/login`
-- Set custom auto message: `/setmessage`
-- Set interval in minutes: `/settime`
-- Start/stop auto message loop: `/startauto`, `/stopauto`
-- All actions only allowed by **OWNER ID**
+<p align="center">
+  <a href="https://heroku.com/deploy?template=https://github.com/yourusername/userbot-heroku">
+    <img src="https://www.herokucdn.com/deploy/button.svg" alt="Deploy to Heroku">
+  </a>
+</p>
 
 ---
 
-## 🚀 Deploy to Heroku
+## 📦 Features
 
-### 🔧 Requirements
-
-- [API_ID and API_HASH](https://my.telegram.org)
-- [BOT_TOKEN from @BotFather](https://t.me/BotFather)
-- [Session String](#-generate-session-string)
-
----
-
-### 🌐 1. Fork/Clone this repository
-
-Or download the ZIP and upload it to your GitHub.
+- 🔐 **Login your user account** with a secure Pyrogram session string
+- ✏️ Set your custom auto-message with `/setmessage`
+- ⏱️ Set time interval in minutes with `/settime`
+- 🚀 Start/Stop message loop with `/startauto` and `/stopauto`
+- 👮 Commands restricted to **OWNER only**
 
 ---
 
-### 🔁 2. Deploy to Heroku
+## ⚙️ Environment Variables (Heroku Config Vars)
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
-
-🔌 Set the following config vars:
-
-| Variable     | Description                             |
-|--------------|-----------------------------------------|
-| `API_ID`     | Your Telegram API ID                    |
-| `API_HASH`   | Your Telegram API Hash                  |
-| `BOT_TOKEN`  | Bot Token from @BotFather               |
-| `OWNER_ID`   | Your Telegram user ID (not bot ID)      |
+| Variable     | Required | Description                          |
+|--------------|----------|--------------------------------------|
+| `API_ID`     | ✅       | Telegram API ID from [my.telegram.org](https://my.telegram.org) |
+| `API_HASH`   | ✅       | Telegram API Hash                    |
+| `BOT_TOKEN`  | ✅       | Telegram Bot Token from [@BotFather](https://t.me/BotFather) |
+| `OWNER_ID`   | ✅       | Your personal Telegram user ID       |
 
 ---
 
-## 🔐 Generate Session String
+## 📜 Commands (for OWNER only)
 
-Run the following Python code **locally** to get your session string:
+| Command             | Function                                    |
+|---------------------|---------------------------------------------|
+| `/login`            | Send session string to login user account   |
+| `/setmessage text`  | Set custom auto-message                     |
+| `/settime 5`        | Set interval in minutes                     |
+| `/startauto`        | Begin automatic message sending             |
+| `/stopauto`         | Stop auto message sending                   |
+| `/help`             | Show all available commands                 |
+
+---
+
+## 🔐 Generate Your Pyrogram Session String
+
+Run this code locally (not on Heroku):
 
 ```python
 from pyrogram import Client
