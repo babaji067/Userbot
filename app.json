@@ -1,26 +1,22 @@
 {
-  "name": "Telegram UserBot",
-  "description": "UserBot that sends auto messages using session login.",
-  "repository": "https://github.com/yourusername/userbot-heroku",
+  "name": "autosender-bot",
+  "description": "A public Telegram bot for auto-sending messages",
+  "repository": "https://github.com/yourusername/autosender-bot",
   "env": {
-    "API_ID": {
-      "description": "Telegram API ID from https://my.telegram.org",
-      "required": true
-    },
-    "API_HASH": {
-      "description": "Telegram API Hash from https://my.telegram.org",
-      "required": true
-    },
     "BOT_TOKEN": {
-      "description": "Your Telegram Bot Token from @BotFather",
-      "required": true
-    },
-    "OWNER_ID": {
-      "description": "Your Telegram User ID (who controls the bot)",
+      "description": "Telegram bot token from @BotFather",
       "required": true
     }
   },
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "free"
+    }
+  },
   "buildpacks": [
-    { "url": "heroku/python" }
+    {
+      "url": "heroku/python"
+    }
   ]
 }
