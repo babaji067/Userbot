@@ -1,24 +1,18 @@
 {
-  "name": "Telegram-Userbot",
-  "description": "A Pyrogram-based userbot that sends auto-messages to all groups",
-  "repository": "https://github.com/yourusername/telegram-userbot",
-  "keywords": ["telegram", "userbot", "pyrogram", "auto"],
+  "name": "Telegram Userbot",
+  "description": "Auto message userbot using Pyrogram",
+  "repository": "https://github.com/yourusername/userbot-heroku",
   "env": {
     "API_ID": {
-      "description": "Your Telegram API ID from my.telegram.org",
+      "description": "Your Telegram API ID",
       "required": true
     },
     "API_HASH": {
-      "description": "Your Telegram API HASH from my.telegram.org",
+      "description": "Your Telegram API Hash",
       "required": true
     },
-    "SESSION_NAME": {
-      "description": "Session name for your userbot",
-      "value": "userbot",
-      "required": false
-    },
-    "MASTER_GROUP_ID": {
-      "description": "Group ID from which to control the userbot (with -100)",
+    "OWNER_ID": {
+      "description": "Your Telegram User ID",
       "required": true
     }
   },
@@ -26,12 +20,5 @@
     {
       "url": "heroku/python"
     }
-  ],
-  "formation": {
-    "worker": {
-      "quantity": 1,
-      "size": "free"
-    }
-  },
-  "stack": "heroku-22"
+  ]
 }
