@@ -1,129 +1,76 @@
+import os
 from pyrogram import Client, filters
 import asyncio
-import os
-from datetime import datetime
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
-MASTER_CHAT_ID = int(os.getenv("MASTER_CHAT_ID", 123456789))  # Control group/chat
+SESSION_NAME = os.getenv("SESSION_NAME", "userbot")
+MASTER_GROUP_ID = int(os.getenv("MASTER_GROUP_ID"))
 
-app = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
+auto_message = "Default auto message"
+delay_minutes = 1
+auto_running = False
 
-# Files for storing
-GROUPS_FILE = "groups.txt"
-MESSAGE_FILE = "message.txt"
-TIME_FILE = "time.txt"
+app = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH)
 
-auto_send_running = False
+open("groups.txt", "a").close()
 
+async def save_group(chat_id):
+    with open("groups.txt", "r+") as f:
+        groups = f.read().splitlines()
+        if str(chat_id) not in groups:
+            f.write(str(chat_id) + "\n")
+            print(f"✅ Group saved: {chat_id}")
 
-def get_groups():
-    if not os.path.exists(GROUPS_FILE):
-        return []
-    with open(GROUPS_FILE, "r") as f:
-        return [int(x.strip()) for x in f if x.strip().isdigit()]
-
-
-def save_group(chat_id):
-    groups = get_groups()
-    if chat_id not in groups:
-        with open(GROUPS_FILE, "a") as f:
-            f.write(f"{chat_id}\n")
-
-
-@app.on_message(filters.group)
-async def group_tracker(_, message):
-    save_group(message.chat.id)
-
-
-@app.on_message(filters.command("setmessage") & filters.chat(MASTER_CHAT_ID))
-async def set_message(_, message):
-    text = message.text.split(" ", 1)
-    if len(text) < 2:
-        await message.reply("❌ Message text missing.")
-        return
-    msg = text[1]
-    with open(MESSAGE_FILE, "w") as f:
-        f.write(msg)
-    await message.reply("✅ Message saved!")
-
-
-@app.on_message(filters.command("setminute") & filters.chat(MASTER_CHAT_ID))
-async def set_time(_, message):
-    parts = message.text.split()
-    if len(parts) < 2 or not parts[1].isdigit():
-        await message.reply("❌ Usage: /setminute 2")
-        return
-    minutes = int(parts[1])
-    with open(TIME_FILE, "w") as f:
-        f.write(str(minutes))
-    await message.reply(f"✅ Time set to {minutes} minute(s).")
-
-
-@app.on_message(filters.command("autosend") & filters.chat(MASTER_CHAT_ID))
-async def start_autosend(_, message):
-    global auto_send_running
-    if auto_send_running:
-        await message.reply("⏳ Auto send already running.")
-        return
-
-    if not os.path.exists(MESSAGE_FILE) or not os.path.exists(TIME_FILE):
-        await message.reply("⚠️ Use /setmessage and /setminute first.")
-        return
-
-    with open(MESSAGE_FILE) as f:
-        msg = f.read()
-
-    with open(TIME_FILE) as f:
-        minutes = int(f.read())
-
-    auto_send_running = True
-    await message.reply(f"🚀 Auto sending started every {minutes} minutes.")
-
-    while auto_send_running:
-        groups = get_groups()
-        for group_id in groups:
+async def auto_send_loop():
+    global auto_running
+    while auto_running:
+        with open("groups.txt", "r") as f:
+            group_ids = f.read().splitlines()
+        for group_id in group_ids:
             try:
-                await app.send_message(group_id, msg)
+                await app.send_message(int(group_id), auto_message)
             except Exception as e:
                 print(f"❌ Failed in {group_id}: {e}")
-        await asyncio.sleep(minutes * 60)
+        await asyncio.sleep(delay_minutes * 60)
 
+@app.on_message(filters.command("setmessage") & filters.chat(MASTER_GROUP_ID))
+async def set_message_handler(client, message):
+    global auto_message
+    try:
+        auto_message = message.text.split(" ", 1)[1]
+        await message.reply(f"✅ Message set:\n\n{auto_message}")
+    except:
+        await message.reply("❌ Usage: /setmessage Your text")
 
-@app.on_message(filters.command("autostop") & filters.chat(MASTER_CHAT_ID))
-async def stop_autosend(_, message):
-    global auto_send_running
-    if auto_send_running:
-        auto_send_running = False
-        await message.reply("🛑 Auto sending stopped.")
+@app.on_message(filters.command("setminute") & filters.chat(MASTER_GROUP_ID))
+async def set_minute_handler(client, message):
+    global delay_minutes
+    try:
+        delay_minutes = int(message.text.split()[1])
+        await message.reply(f"✅ Delay set to {delay_minutes} minute(s)")
+    except:
+        await message.reply("❌ Usage: /setminute 2")
+
+@app.on_message(filters.command("autosend") & filters.chat(MASTER_GROUP_ID))
+async def start_auto_send(client, message):
+    global auto_running
+    if not auto_running:
+        auto_running = True
+        await message.reply("▶️ Auto messaging started.")
+        asyncio.create_task(auto_send_loop())
     else:
-        await message.reply("⏸ Auto sending was not running.")
+        await message.reply("⚠️ Already running.")
 
+@app.on_message(filters.command("autostop") & filters.chat(MASTER_GROUP_ID))
+async def stop_auto_send(client, message):
+    global auto_running
+    auto_running = False
+    await message.reply("⏹ Auto messaging stopped.")
 
-@app.on_message(filters.command("status") & filters.chat(MASTER_CHAT_ID))
-async def status(_, message):
-    groups = get_groups()
-    total = len(groups)
-    msg = "📊 **Status:**\n"
-    msg += f"👥 Groups: {total}\n"
-    if os.path.exists(MESSAGE_FILE):
-        with open(MESSAGE_FILE) as f:
-            msg += f"📝 Message: `{f.read()}`\n"
-    if os.path.exists(TIME_FILE):
-        with open(TIME_FILE) as f:
-            msg += f"⏱ Interval: {f.read()} minute(s)\n"
-    msg += f"🚦 Running: {'✅ Yes' if auto_send_running else '❌ No'}"
-    await message.reply(msg)
+@app.on_message(filters.new_chat_members)
+async def new_group_handler(client, message):
+    await save_group(message.chat.id)
 
-
-@app.on_message(filters.command("ping"))
-async def ping(_, message):
-    start = datetime.now()
-    m = await message.reply("🏓 Pinging...")
-    end = datetime.now()
-    latency = (end - start).microseconds // 1000
-    await m.edit(f"✅ Pong! `{latency}ms`")
-
-
+print("🚀 Userbot starting...")
 app.run()
