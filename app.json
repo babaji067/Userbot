@@ -1,26 +1,28 @@
 {
-  "name": "Telegram UserBot Auto",
-  "description": "A Telegram userbot that sends auto messages to all joined groups.",
-  "repository": "https://github.com/yourusername/userbot-heroku",
+  "name": "telegram-userbot-auto",
+  "description": "Auto-message sender via personal Telegram account",
+  "repository": "https://github.com/yourusername/telegram-userbot-auto",
   "env": {
     "API_ID": {
-      "description": "Your Telegram API_ID from my.telegram.org",
+      "description": "Telegram API ID from https://my.telegram.org",
       "required": true
     },
     "API_HASH": {
-      "description": "Your Telegram API_HASH from my.telegram.org",
+      "description": "Telegram API HASH from https://my.telegram.org",
       "required": true
     },
-    "OWNER_ID": {
-      "description": "Your Telegram User ID (to control bot)",
+    "SESSION_STRING": {
+      "description": "Generated Telethon session string",
       "required": true
     },
-    "STRING_SESSION": {
-      "description": "Generated Pyrogram StringSession",
+    "CONTROL_GROUP_ID": {
+      "description": "Your private control group ID to manage the bot",
       "required": true
     }
   },
   "buildpacks": [
-    { "url": "heroku/python" }
+    {
+      "url": "heroku/python"
+    }
   ]
 }
