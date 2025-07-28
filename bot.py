@@ -1,76 +1,70 @@
-import os
 from pyrogram import Client, filters
+from pyrogram.types import Message
 import asyncio
+import os
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-SESSION_NAME = os.getenv("SESSION_NAME", "userbot")
-MASTER_GROUP_ID = int(os.getenv("MASTER_GROUP_ID"))
+OWNER_ID = int(os.getenv("OWNER_ID"))
 
-auto_message = "Default auto message"
-delay_minutes = 1
+auto_message = "Hello, this is auto-message!"
+auto_interval = 2  # in minutes
 auto_running = False
 
-app = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH)
+app = Client("userbot", api_id=API_ID, api_hash=API_HASH, in_memory=True)
 
-open("groups.txt", "a").close()
 
-async def save_group(chat_id):
-    with open("groups.txt", "r+") as f:
-        groups = f.read().splitlines()
-        if str(chat_id) not in groups:
-            f.write(str(chat_id) + "\n")
-            print(f"✅ Group saved: {chat_id}")
-
-async def auto_send_loop():
-    global auto_running
-    while auto_running:
-        with open("groups.txt", "r") as f:
-            group_ids = f.read().splitlines()
-        for group_id in group_ids:
-            try:
-                await app.send_message(int(group_id), auto_message)
-            except Exception as e:
-                print(f"❌ Failed in {group_id}: {e}")
-        await asyncio.sleep(delay_minutes * 60)
-
-@app.on_message(filters.command("setmessage") & filters.chat(MASTER_GROUP_ID))
-async def set_message_handler(client, message):
+@app.on_message(filters.command("setmessage") & filters.user(OWNER_ID))
+async def set_message(_, msg: Message):
     global auto_message
-    try:
-        auto_message = message.text.split(" ", 1)[1]
-        await message.reply(f"✅ Message set:\n\n{auto_message}")
-    except:
-        await message.reply("❌ Usage: /setmessage Your text")
+    if len(msg.command) < 2:
+        await msg.reply("❌ Usage: `/setmessage Your message`", quote=True)
+        return
+    auto_message = msg.text.split(" ", 1)[1]
+    await msg.reply(f"✅ Auto message set to:\n`{auto_message}`", quote=True)
 
-@app.on_message(filters.command("setminute") & filters.chat(MASTER_GROUP_ID))
-async def set_minute_handler(client, message):
-    global delay_minutes
-    try:
-        delay_minutes = int(message.text.split()[1])
-        await message.reply(f"✅ Delay set to {delay_minutes} minute(s)")
-    except:
-        await message.reply("❌ Usage: /setminute 2")
 
-@app.on_message(filters.command("autosend") & filters.chat(MASTER_GROUP_ID))
-async def start_auto_send(client, message):
+@app.on_message(filters.command("setminute") & filters.user(OWNER_ID))
+async def set_interval(_, msg: Message):
+    global auto_interval
+    if len(msg.command) < 2 or not msg.command[1].isdigit():
+        await msg.reply("❌ Usage: `/setminute 5`", quote=True)
+        return
+    auto_interval = int(msg.command[1])
+    await msg.reply(f"✅ Auto interval set to: `{auto_interval} minutes`", quote=True)
+
+
+@app.on_message(filters.command("startauto") & filters.user(OWNER_ID))
+async def start_auto(_, msg: Message):
     global auto_running
-    if not auto_running:
-        auto_running = True
-        await message.reply("▶️ Auto messaging started.")
-        asyncio.create_task(auto_send_loop())
-    else:
-        await message.reply("⚠️ Already running.")
+    if auto_running:
+        await msg.reply("⚠️ Auto messaging already running!", quote=True)
+        return
+    auto_running = True
+    await msg.reply("✅ Auto messaging started!", quote=True)
 
-@app.on_message(filters.command("autostop") & filters.chat(MASTER_GROUP_ID))
-async def stop_auto_send(client, message):
+    while auto_running:
+        try:
+            async for dialog in app.get_dialogs():
+                chat = dialog.chat
+                if chat.type in ["supergroup", "group"]:
+                    try:
+                        await app.send_message(chat.id, auto_message)
+                        await asyncio.sleep(2)
+                    except Exception as e:
+                        print(f"[ERROR] {chat.id} - {e}")
+            await asyncio.sleep(auto_interval * 60)
+        except Exception as e:
+            print(f"[MAIN LOOP ERROR] {e}")
+            await asyncio.sleep(10)
+
+
+@app.on_message(filters.command("stopauto") & filters.user(OWNER_ID))
+async def stop_auto(_, msg: Message):
     global auto_running
     auto_running = False
-    await message.reply("⏹ Auto messaging stopped.")
+    await msg.reply("🛑 Auto messaging stopped.", quote=True)
 
-@app.on_message(filters.new_chat_members)
-async def new_group_handler(client, message):
-    await save_group(message.chat.id)
 
-print("🚀 Userbot starting...")
+print("✅ Userbot deployed and running...")
 app.run()
