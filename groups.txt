@@ -1,1 +1,20 @@
-(empty initially)
+from pyrogram import Client, filters
+
+app = Client("userbot")
+
+def save_group(chat_id):
+    try:
+        with open("groups.txt", "r") as f:
+            groups = f.read().splitlines()
+    except FileNotFoundError:
+        groups = []
+
+    if str(chat_id) not in groups:
+        with open("groups.txt", "a") as f:
+            f.write(f"{chat_id}\n")
+
+@app.on_message(filters.group)
+def handle_group(client, message):
+    save_group(message.chat.id)
+
+app.run()
