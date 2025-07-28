@@ -1,17 +1,18 @@
 {
-  "name": "autosender-bot",
-  "description": "A public Telegram bot for auto-sending messages",
-  "repository": "https://github.com/yourusername/autosender-bot",
+  "name": "TelegramUserbot",
+  "description": "Userbot for auto messaging with Heroku",
   "env": {
-    "BOT_TOKEN": {
-      "description": "Telegram bot token from @BotFather",
+    "API_ID": {
+      "description": "Telegram API ID",
       "required": true
-    }
-  },
-  "formation": {
-    "worker": {
-      "quantity": 1,
-      "size": "free"
+    },
+    "API_HASH": {
+      "description": "Telegram API HASH",
+      "required": true
+    },
+    "SESSION_STRING": {
+      "description": "Pyrogram Session String",
+      "required": true
     }
   },
   "buildpacks": [
