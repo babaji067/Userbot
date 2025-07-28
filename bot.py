@@ -1,97 +1,92 @@
-from pyrogram import Client, filters
-from pyrogram.types import Message
-from pyrogram.session import StringSession
-import asyncio
 import os
+import asyncio
+from dotenv import load_dotenv
+from telethon import TelegramClient, events
+from telethon.tl.types import ChannelParticipantsAdmins
+from datetime import datetime
 
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-OWNER_ID = int(os.environ.get("OWNER_ID"))
-STRING_SESSION = os.environ.get("STRING_SESSION")
+load_dotenv()
 
-auto_message = "Hello, this is auto-message!"
-auto_interval = 2
-auto_running = False
+api_id = int(os.getenv("API_ID"))
+api_hash = os.getenv("API_HASH")
+session = os.getenv("SESSION_STRING")
+control_group = int(os.getenv("CONTROL_GROUP_ID"))
 
-app = Client(session_name=StringSession(STRING_SESSION), api_id=API_ID, api_hash=API_HASH)
+client = TelegramClient(StringSession(session), api_id, api_hash)
+
+# Variables
+auto_message = "Hello everyone!"
+interval_min = 10
+auto_mode = False
+sent_chats = set()
 
 
-@app.on_message(filters.command("setmessage") & filters.user(OWNER_ID))
-async def set_message(_, msg: Message):
+@client.on(events.NewMessage(chats=control_group, pattern=r"^/setmessage (.+)"))
+async def set_message(event):
     global auto_message
-    if len(msg.command) < 2:
-        return await msg.reply("❌ Usage: `/setmessage your message`")
-    auto_message = msg.text.split(" ", 1)[1]
-    await msg.reply(f"✅ Auto-message set:\n`{auto_message}`")
+    auto_message = event.pattern_match.group(1)
+    await event.reply(f"✅ Auto message updated to:\n\n{auto_message}")
 
 
-@app.on_message(filters.command("setminute") & filters.user(OWNER_ID))
-async def set_interval(_, msg: Message):
-    global auto_interval
-    if len(msg.command) < 2 or not msg.command[1].isdigit():
-        return await msg.reply("❌ Usage: `/setminute 5`")
-    auto_interval = int(msg.command[1])
-    await msg.reply(f"✅ Interval set to: `{auto_interval}` minute(s)")
-
-
-@app.on_message(filters.command("startauto") & filters.user(OWNER_ID))
-async def start_auto(_, msg: Message):
-    global auto_running
-    if auto_running:
-        return await msg.reply("⚠️ Auto-messaging is already running!")
-    auto_running = True
-    await msg.reply("✅ Auto-messaging started.")
-
-    while auto_running:
-        try:
-            async for dialog in app.get_dialogs():
-                chat = dialog.chat
-                if chat.type in ["supergroup", "group"]:
-                    try:
-                        await app.send_message(chat.id, auto_message)
-                        await asyncio.sleep(2)
-                    except Exception as e:
-                        print(f"[SEND ERROR] {chat.id} - {e}")
-            await asyncio.sleep(auto_interval * 60)
-        except Exception as e:
-            print(f"[LOOP ERROR] {e}")
-            await asyncio.sleep(10)
-
-
-@app.on_message(filters.command("stopauto") & filters.user(OWNER_ID))
-async def stop_auto(_, msg: Message):
-    global auto_running
-    auto_running = False
-    await msg.reply("🛑 Auto-messaging stopped.")
-
-
-@app.on_message(filters.command("status") & filters.user(OWNER_ID))
-async def status(_, msg: Message):
-    text = f"📊 **Auto Message Status**\n\n"
-    text += f"Message: `{auto_message}`\n"
-    text += f"Interval: `{auto_interval}` minute(s)\n"
-    text += f"Running: {'✅ Yes' if auto_running else '❌ No'}"
-    await msg.reply(text)
-
-
-@app.on_message(filters.command("groups") & filters.user(OWNER_ID))
-async def groups(_, msg: Message):
-    text = "**📋 Joined Groups:**\n"
-    count = 0
-    async for dialog in app.get_dialogs():
-        if dialog.chat.type in ["group", "supergroup"]:
-            count += 1
-            text += f"{count}. {dialog.chat.title} (`{dialog.chat.id}`)\n"
-    if count == 0:
-        await msg.reply("❌ No groups found.")
+@client.on(events.NewMessage(chats=control_group, pattern=r"^/setminute (\d{1,2})"))
+async def set_interval(event):
+    global interval_min
+    minutes = int(event.pattern_match.group(1))
+    if 1 <= minutes <= 60:
+        interval_min = minutes
+        await event.reply(f"✅ Message interval set to {interval_min} minutes.")
     else:
-        await msg.reply(text)
+        await event.reply("⚠️ Please enter a valid number between 1-60.")
 
 
-@app.on_message(filters.command("ping") & filters.user(OWNER_ID))
-async def ping(_, msg: Message):
-    await msg.reply("🏓 Pong! I’m alive.")
+@client.on(events.NewMessage(chats=control_group, pattern=r"^/startauto"))
+async def start_auto(event):
+    global auto_mode
+    if auto_mode:
+        return await event.reply("⚠️ Auto messaging is already running.")
+    auto_mode = True
+    await event.reply("✅ Auto messaging started.")
+    asyncio.create_task(send_periodic_messages())
 
 
-print("✅ USERBOT RUNNING...")
-app.run()
+@client.on(events.NewMessage(chats=control_group, pattern=r"^/stopauto"))
+async def stop_auto(event):
+    global auto_mode
+    auto_mode = False
+    await event.reply("🛑 Auto messaging stopped.")
+
+
+async def send_periodic_messages():
+    global auto_mode
+    while auto_mode:
+        try:
+            async for dialog in client.iter_dialogs():
+                entity = dialog.entity
+                if getattr(entity, "megagroup", False) and entity.id not in sent_chats:
+                    try:
+                        await client.send_message(entity.id, auto_message)
+                        print(f"[{datetime.now()}] Sent to: {entity.title}")
+                        sent_chats.add(entity.id)
+                    except Exception as e:
+                        print(f"❌ Failed to send to {entity.title}: {e}")
+        except Exception as e:
+            print("Error in message loop:", e)
+        await asyncio.sleep(interval_min * 60)
+        sent_chats.clear()
+
+
+# Detect kicked/banned
+@client.on(events.ChatAction())
+async def chat_kick_handler(event):
+    if event.user_id == (await client.get_me()).id:
+        try:
+            chat = await event.get_chat()
+            text = f"⚠️ Removed from group:\n\nGroup: {chat.title}\nID: `{chat.id}`"
+            await client.send_message(control_group, text)
+        except Exception:
+            pass
+
+
+print("🔁 UserBot Starting...")
+client.start()
+client.run_until_disconnected()
