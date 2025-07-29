@@ -1,22 +1,21 @@
 {
-  "name": "telegram-userbot-auto",
-  "description": "Auto-message sender via personal Telegram account",
-  "repository": "https://github.com/yourusername/telegram-userbot-auto",
+  "name": "telegram-userbot-auto-message",
+  "description": "Userbot to send auto message in all joined groups",
   "env": {
     "API_ID": {
-      "description": "Telegram API ID from https://my.telegram.org",
+      "description": "Your Telegram API ID",
       "required": true
     },
     "API_HASH": {
-      "description": "Telegram API HASH from https://my.telegram.org",
+      "description": "Your Telegram API Hash",
       "required": true
     },
     "SESSION_STRING": {
-      "description": "Generated Telethon session string",
+      "description": "Pyrogram Session String of your account",
       "required": true
     },
     "CONTROL_GROUP_ID": {
-      "description": "Your private control group ID to manage the bot",
+      "description": "Control Group ID (e.g. -1001234567890)",
       "required": true
     }
   },
