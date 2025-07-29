@@ -1,107 +1,71 @@
 import os
 import asyncio
+from pyrogram import Client, filters
+from pyrogram.errors import PeerIdInvalid, UserDeactivatedBan, UserBannedInChannel
 from dotenv import load_dotenv
-from telethon.sync import TelegramClient
-from telethon.sessions import StringSession
-from telethon import events
-from datetime import datetime
 
 load_dotenv()
 
 api_id = int(os.getenv("API_ID"))
 api_hash = os.getenv("API_HASH")
-session = os.getenv("SESSION_STRING")
+session_string = os.getenv("SESSION_STRING")
 control_group = int(os.getenv("CONTROL_GROUP_ID"))
 
-client = TelegramClient(StringSession(session), api_id, api_hash)
+app = Client(session_string=session_string, api_id=api_id, api_hash=api_hash)
 
-auto_message = "👋 Hello, this is a default auto-message!"
-interval_min = 10
-auto_mode = False
-sent_chats = set()
+auto_send = False
+custom_message = "👋 Hello group!"
+interval = 10  # default in minutes
 
-@client.on(events.NewMessage(chats=control_group, pattern=r"^/start$"))
-async def start_cmd(event):
-    await event.reply(
-        "**👋 Welcome! Yeh Personal UserBot hai.**\n\n"
-        "🛠 Available Commands:\n"
-        "/setmessage <text> - Set message\n"
-        "/setminute <1-60> - Set interval\n"
-        "/startauto - Start auto messaging\n"
-        "/stopauto - Stop auto messaging\n"
-        "/help - Show commands"
-    )
+async def auto_sender():
+    global auto_send
+    while auto_send:
+        async for dialog in app.get_dialogs():
+            if dialog.chat.type in ["group", "supergroup"]:
+                try:
+                    await app.send_message(dialog.chat.id, custom_message)
+                    await asyncio.sleep(2)
+                except Exception as e:
+                    # Notification for ban/mute in group
+                    error_text = str(e).lower()
+                    if "banned" in error_text or "not enough rights" in error_text or "muted" in error_text:
+                        await app.send_message(control_group, f"⚠️ Can't send in {dialog.chat.title} (`{dialog.chat.id}`):\n`{e}`")
+        await asyncio.sleep(interval * 60)
 
-@client.on(events.NewMessage(chats=control_group, pattern=r"^/help$"))
-async def help_cmd(event):
-    await event.reply(
-        "**📘 Help Menu**\n\n"
-        "/start - Show welcome message\n"
-        "/setmessage <text> - Custom auto message\n"
-        "/setminute <1-60> - Set time in minutes\n"
-        "/startauto - Begin auto-posting\n"
-        "/stopauto - Stop auto-posting"
-    )
-
-@client.on(events.NewMessage(chats=control_group, pattern=r"^/setmessage (.+)"))
-async def set_message(event):
-    global auto_message
-    auto_message = event.pattern_match.group(1)
-    print(f"✅ /setmessage received: {auto_message}")
-    await event.reply(f"✅ Auto-message updated:\n\n{auto_message}")
-
-@client.on(events.NewMessage(chats=control_group, pattern=r"^/setminute (\d{1,2})"))
-async def set_interval(event):
-    global interval_min
-    minutes = int(event.pattern_match.group(1))
-    if 1 <= minutes <= 60:
-        interval_min = minutes
-        await event.reply(f"✅ Message interval set to {interval_min} minutes.")
+@app.on_message(filters.chat(control_group) & filters.command("startauto"))
+async def start_auto(client, message):
+    global auto_send
+    if not auto_send:
+        auto_send = True
+        asyncio.create_task(auto_sender())
+        await message.reply("✅ Auto messaging started.")
+        await client.send_message(control_group, "🚀 Auto message sending **started**.")
     else:
-        await event.reply("⚠️ Must be between 1 and 60.")
+        await message.reply("⚠️ Already running.")
 
-@client.on(events.NewMessage(chats=control_group, pattern=r"^/startauto$"))
-async def start_auto(event):
-    global auto_mode
-    if auto_mode:
-        return await event.reply("⚠️ Auto messaging already running.")
-    auto_mode = True
-    await event.reply("✅ Auto messaging started.")
-    asyncio.create_task(send_periodic_messages())
+@app.on_message(filters.chat(control_group) & filters.command("stopauto"))
+async def stop_auto(client, message):
+    global auto_send
+    auto_send = False
+    await message.reply("🛑 Auto messaging stopped.")
+    await client.send_message(control_group, "⛔ Auto message sending **stopped**.")
 
-@client.on(events.NewMessage(chats=control_group, pattern=r"^/stopauto$"))
-async def stop_auto(event):
-    global auto_mode
-    auto_mode = False
-    await event.reply("🛑 Auto messaging stopped.")
+@app.on_message(filters.chat(control_group) & filters.command("setmsg"))
+async def set_msg(client, message):
+    global custom_message
+    if len(message.command) < 2:
+        return await message.reply("⚠️ Use like: `/setmsg Your Message`")
+    custom_message = message.text.split(" ", 1)[1]
+    await message.reply("✏️ Message updated.")
+    await client.send_message(control_group, f"📝 New message set:\n\n{custom_message}")
 
-async def send_periodic_messages():
-    global auto_mode
-    while auto_mode:
-        try:
-            async for dialog in client.iter_dialogs():
-                entity = dialog.entity
-                if getattr(entity, "megagroup", False) and entity.id not in sent_chats:
-                    try:
-                        await client.send_message(entity.id, auto_message)
-                        print(f"[{datetime.now()}] Sent to: {entity.title}")
-                        sent_chats.add(entity.id)
-                    except Exception as e:
-                        print(f"❌ Failed to send in {entity.title}: {e}")
-        except Exception as e:
-            print("Loop Error:", e)
-        await asyncio.sleep(interval_min * 60)
-        sent_chats.clear()
+@app.on_message(filters.chat(control_group) & filters.command("setinterval"))
+async def set_interval(client, message):
+    global interval
+    if len(message.command) < 2 or not message.command[1].isdigit():
+        return await message.reply("⚠️ Use like: `/setinterval 10`")
+    interval = int(message.command[1])
+    await message.reply(f"⏱ Interval set to {interval} minutes.")
+    await client.send_message(control_group, f"🔁 Auto message interval set to **{interval} minutes**.")
 
-@client.on(events.ChatAction())
-async def kicked_from_group(event):
-    if event.user_id == (await client.get_me()).id and event.left:
-        chat = await event.get_chat()
-        await client.send_message(
-            control_group,
-            f"🚫 Removed or banned from:\n**{chat.title}**\n🆔 ID: `{chat.id}`"
-        )
-
-print("🔁 UserBot Starting...")
-client.start()
-client.run_until_disconnected()
+app.run()
